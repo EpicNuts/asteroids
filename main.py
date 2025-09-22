@@ -12,6 +12,11 @@ def main():
 
     while True:
 
+        clock = pygame.time.Clock()
+        dt = 0
+
+
+        # end loop when window closed
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return
@@ -20,7 +25,7 @@ def main():
         pygame.display.flip()
 
 
-
+        dt = clock.tick(60) / 1000  # Amount of seconds between each loop.
 
 
 if __name__ == "__main__":
