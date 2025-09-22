@@ -11,10 +11,10 @@ def main():
 
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     player = Player(x = SCREEN_WIDTH / 2, y = SCREEN_HEIGHT / 2)
+    clock = pygame.time.Clock()
 
     while True:
-        clock = pygame.time.Clock()
-        dt = 0
+        dt = clock.tick(60) / 1000  # Amount of seconds between each loop.
 
         # end loop when window closed
         for event in pygame.event.get():
@@ -24,14 +24,16 @@ def main():
         # Clear the screen
         screen.fill('black')
 
-        # Draw the player
+        # update the player
+        player.update(dt)
+        
+        # render the player
         player.draw(screen)
         
         # 'flip' the display ?
         pygame.display.flip()
 
         # Cap the framerate at 60fps and get the delta time.
-        dt = clock.tick(60) / 1000  # Amount of seconds between each loop.
 
 
 if __name__ == "__main__":
