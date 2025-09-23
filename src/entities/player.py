@@ -7,6 +7,7 @@ from ..game.constants import (
     PLAYER_RADIUS, PLAYER_TURN_SPEED, PLAYER_ACCELERATION, PLAYER_DRAG,
     PLAYER_MAX_SPEED, PLAYER_SHOOT_SPEED, PLAYER_SHOOT_COOLDOWN, SHOT_RADIUS
 )
+from ..utils.sound import play_sound
 
 
 class Player(CircleShape):
@@ -46,6 +47,15 @@ class Player(CircleShape):
         """Add acceleration in the forward direction."""
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
         self.acceleration += forward * PLAYER_ACCELERATION * dt
+        # Play thrust sound (only occasionally to avoid spam)
+        if hasattr(self, '_thrust_sound_timer'):
+            self._thrust_sound_timer -= dt
+        else:
+            self._thrust_sound_timer = 0
+        
+        if self._thrust_sound_timer <= 0:
+            play_sound("thrust")
+            self._thrust_sound_timer = 0.5  # Play thrust sound every 0.5 seconds while accelerating
 
     def apply_drag(self, dt):
         """Apply drag to gradually slow down the player when not accelerating."""
@@ -56,6 +66,8 @@ class Player(CircleShape):
         shot = Shot(self.position.x, self.position.y, SHOT_RADIUS)
         shot.velocity = pygame.Vector2(0, 1).rotate(self.rotation) * PLAYER_SHOOT_SPEED
         self.timer = PLAYER_SHOOT_COOLDOWN
+        # Play shoot sound
+        play_sound("shoot")
     
     def is_vulnerable(self):
         """Returns True if the player can be hit by asteroids."""

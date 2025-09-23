@@ -4,6 +4,7 @@ import pygame
 import random
 from .base import CircleShape
 from ..game.constants import ASTEROID_MIN_RADIUS
+from ..utils.sound import play_sound
 
 
 class Asteroid(CircleShape):
@@ -15,6 +16,9 @@ class Asteroid(CircleShape):
 
     def split(self):
         """Split the asteroid into smaller pieces."""
+        # Play explosion sound
+        play_sound("explosion")
+        
         # Logic to split the asteroid into smaller pieces
         self.kill()  # Remove the current asteroid for now
         if self.radius <= ASTEROID_MIN_RADIUS:

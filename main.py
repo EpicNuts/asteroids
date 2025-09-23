@@ -2,12 +2,17 @@
 
 import pygame
 import sys
-from src.game.constants import SCREEN_WIDTH, SCREEN_HEIGHT, PLAYER_LIVES
+from src.game.constants import (
+    SCREEN_WIDTH, SCREEN_HEIGHT, PLAYER_LIVES, MASTER_VOLUME,
+    SOUND_PATH_SHOOT, SOUND_PATH_EXPLOSION, SOUND_PATH_THRUST, SOUND_PATH_COLLISION,
+    SOUND_VOLUME_SHOOT, SOUND_VOLUME_EXPLOSION, SOUND_VOLUME_THRUST, SOUND_VOLUME_COLLISION
+)
 from src.game.states import GameState, reset_game, draw_lives, draw_game_over
 from src.entities.player import Player
 from src.entities.asteroid import Asteroid
 from src.entities.asteroidfield import AsteroidField
 from src.entities.shot import Shot
+from src.utils.sound import get_sound_manager
 
 
 def main():
@@ -18,6 +23,16 @@ def main():
     
     # Initialize pygame
     pygame.init()
+    
+    # Initialize sound system
+    sound_manager = get_sound_manager()
+    sound_manager.set_master_volume(MASTER_VOLUME)
+    
+    # Load sound effects
+    sound_manager.load_sound("shoot", SOUND_PATH_SHOOT, SOUND_VOLUME_SHOOT)
+    sound_manager.load_sound("explosion", SOUND_PATH_EXPLOSION, SOUND_VOLUME_EXPLOSION)
+    sound_manager.load_sound("thrust", SOUND_PATH_THRUST, SOUND_VOLUME_THRUST)
+    sound_manager.load_sound("collision", SOUND_PATH_COLLISION, SOUND_VOLUME_COLLISION)
     
     # Initialize font
     pygame.font.init()
@@ -77,6 +92,10 @@ def main():
             # Check for player-asteroid collision
             for asteroid in asteroids:
                 if player.is_vulnerable() and player.collision(asteroid):
+                    # Play collision sound
+                    from src.utils.sound import play_sound
+                    play_sound("collision")
+                    
                     lives -= 1
                     if lives <= 0:
                         game_state = GameState.GAME_OVER
