@@ -11,38 +11,47 @@ def main():
     print(f"Screen width: {SCREEN_WIDTH}")
     print(f"Screen height: {SCREEN_HEIGHT}")
     
+    # initialize pygame
     pygame.init()
 
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    
+    # create the game window
+    GAMESCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Asteroids")
+
+    # create sprite groups
     updatable = pygame.sprite.Group()
     drawable = pygame.sprite.Group()
-    Player.containers = updatable, drawable
-
-    asteroids = pygame.sprite.Group()
-    Asteroid.containers = updatable, drawable, asteroids
 
     shots = pygame.sprite.Group()
-    Shot.containers = updatable, drawable, shots
+    asteroids = pygame.sprite.Group()
 
+    # set the sprite groups to the class containers
+    Player.containers = updatable, drawable
+    Shot.containers = updatable, drawable, shots
+    
+    Asteroid.containers = updatable, drawable, asteroids
     AsteroidField.containers = updatable
 
+    # create the game objects
     player = Player(x = SCREEN_WIDTH / 2, y = SCREEN_HEIGHT / 2)
     asteroidfield = AsteroidField()
-    
     clock = pygame.time.Clock()
 
-
-    while True:
-        dt = clock.tick(60) / 1000  # Amount of seconds between each loop.
-
-        # end loop when window closed
+    # main game loop
+    RUNGAME = True
+    while RUNGAME:
+        # end loop when window closed or escape key pressed
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return
+                RUNGAME = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    RUNGAME = False
 
-        # Clear the screen
-        screen.fill('black')
+        dt = clock.tick(60) / 1000  # Amount of seconds between each loop.
+        
+        # clear the screen
+        GAMESCREEN.fill('black')
 
         # update the player
         updatable.update(dt)
@@ -61,7 +70,7 @@ def main():
 
         # render the player
         for sprite in drawable: 
-            sprite.draw(screen)
+            sprite.draw(GAMESCREEN)
 
         # 'flip' the display ?
         pygame.display.flip()

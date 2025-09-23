@@ -8,6 +8,7 @@ class Player(CircleShape):
         super().__init__(x, y, PLAYER_RADIUS)
         self.rotation = 0
         self.timer = 0
+        self.acceleration = pygame.Vector2(0, 0)
 
     def triangle(self):
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
@@ -23,9 +24,13 @@ class Player(CircleShape):
     def rotate(self, dt):
         self.rotation += PLAYER_TURN_SPEED * dt
 
-    def move(self, dt):
+    def accelerate(self, dt):
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
-        self.position += forward * PLAYER_SPEED * dt
+        self.acceleration += forward * PLAYER_ACCELERATION * dt
+
+    def apply_drag(self, dt):
+        # Apply drag to gradually slow down the player when not accelerating
+        self.velocity *= PLAYER_DRAG
 
     def shoot(self):
         shot = Shot(self.position.x, self.position.y, SHOT_RADIUS)
@@ -35,6 +40,9 @@ class Player(CircleShape):
     def update(self, dt):
         if self.timer > 0:
             self.timer -= dt
+
+        # Reset acceleration each frame
+        self.acceleration = pygame.Vector2(0, 0)
 
         keys = pygame.key.get_pressed()
 
@@ -47,12 +55,25 @@ class Player(CircleShape):
             self.rotate(dt)
 
         if keys[pygame.K_w] or keys[pygame.K_UP]:
-            # move forward
-            self.move(dt)
+            # accelerate forward
+            self.accelerate(dt)
 
         if keys[pygame.K_s] or keys[pygame.K_DOWN]:
-            # move backward
-            self.move(-dt)
+            # accelerate backward
+            self.accelerate(-dt)
+
+        # Apply drag when not accelerating
+        self.apply_drag(dt)
+
+        # Update velocity based on acceleration
+        self.velocity += self.acceleration
+
+        # Cap the velocity to maximum speed
+        if self.velocity.length() > PLAYER_MAX_SPEED:
+            self.velocity = self.velocity.normalize() * PLAYER_MAX_SPEED
+
+        # Update position based on velocity
+        self.position += self.velocity * dt
 
         if keys[pygame.K_SPACE]:
             # shoot

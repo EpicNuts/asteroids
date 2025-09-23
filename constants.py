@@ -8,7 +8,10 @@ ASTEROID_MAX_RADIUS = ASTEROID_MIN_RADIUS * ASTEROID_KINDS
 
 PLAYER_RADIUS = 20
 PLAYER_TURN_SPEED = 300
+PLAYER_ACCELERATION = 800  # Increased for more noticeable acceleration
 PLAYER_SPEED = 200
+PLAYER_MAX_SPEED = 600     # More reasonable max speed
+PLAYER_DRAG = 0.98         # Reduced drag so acceleration is more effective
 PLAYER_SHOOT_SPEED = 500
 PLAYER_SHOOT_COOLDOWN = 0.3 # seconds
 
