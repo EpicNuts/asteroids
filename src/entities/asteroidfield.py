@@ -1,10 +1,17 @@
+"""Asteroid field spawner."""
+
 import pygame
 import random
-from asteroid import Asteroid
-from constants import *
+from .asteroid import Asteroid
+from ..game.constants import (
+    ASTEROID_MAX_RADIUS, SCREEN_HEIGHT, SCREEN_WIDTH, ASTEROID_SPAWN_RATE,
+    ASTEROID_KINDS, ASTEROID_MIN_RADIUS
+)
 
 
 class AsteroidField(pygame.sprite.Sprite):
+    """Manages spawning of asteroids at screen edges."""
+    
     edges = [
         [
             pygame.Vector2(1, 0),
@@ -33,10 +40,12 @@ class AsteroidField(pygame.sprite.Sprite):
         self.spawn_timer = 0.0
 
     def spawn(self, radius, position, velocity):
+        """Spawn a new asteroid with given parameters."""
         asteroid = Asteroid(position.x, position.y, radius)
         asteroid.velocity = velocity
 
     def update(self, dt):
+        """Update the spawn timer and spawn new asteroids."""
         self.spawn_timer += dt
         if self.spawn_timer > ASTEROID_SPAWN_RATE:
             self.spawn_timer = 0

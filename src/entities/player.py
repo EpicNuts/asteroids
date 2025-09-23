@@ -1,16 +1,26 @@
+"""Player ship entity."""
+
 import pygame
-from shot import Shot
-from circleshape import CircleShape
-from constants import *
+from .shot import Shot
+from .base import CircleShape
+from ..game.constants import (
+    PLAYER_RADIUS, PLAYER_TURN_SPEED, PLAYER_ACCELERATION, PLAYER_DRAG,
+    PLAYER_MAX_SPEED, PLAYER_SHOOT_SPEED, PLAYER_SHOOT_COOLDOWN, SHOT_RADIUS
+)
+
 
 class Player(CircleShape):
+    """Player ship class."""
+    
     def __init__(self, x, y):
         super().__init__(x, y, PLAYER_RADIUS)
         self.rotation = 0
         self.timer = 0
         self.acceleration = pygame.Vector2(0, 0)
+        self.invulnerable_timer = 0  # Invulnerability period after respawn
 
     def triangle(self):
+        """Calculate the triangle points for drawing the ship."""
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
         right = pygame.Vector2(0, 1).rotate(self.rotation + 90) * self.radius / 1.5
         a = self.position + forward * self.radius
@@ -19,27 +29,49 @@ class Player(CircleShape):
         return [a, b, c]
     
     def draw(self, screen):
-        pygame.draw.polygon(screen, "white", self.triangle(), 2)
+        """Draw the player ship with blinking during invulnerability."""
+        # Blink during invulnerability period
+        if self.invulnerable_timer > 0:
+            # Blink effect - only draw every few frames
+            if int(self.invulnerable_timer * 10) % 2 == 0:
+                pygame.draw.polygon(screen, "white", self.triangle(), 2)
+        else:
+            pygame.draw.polygon(screen, "white", self.triangle(), 2)
 
     def rotate(self, dt):
+        """Rotate the player ship."""
         self.rotation += PLAYER_TURN_SPEED * dt
 
     def accelerate(self, dt):
+        """Add acceleration in the forward direction."""
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
         self.acceleration += forward * PLAYER_ACCELERATION * dt
 
     def apply_drag(self, dt):
-        # Apply drag to gradually slow down the player when not accelerating
+        """Apply drag to gradually slow down the player when not accelerating."""
         self.velocity *= PLAYER_DRAG
 
     def shoot(self):
+        """Create a new shot projectile."""
         shot = Shot(self.position.x, self.position.y, SHOT_RADIUS)
         shot.velocity = pygame.Vector2(0, 1).rotate(self.rotation) * PLAYER_SHOOT_SPEED
         self.timer = PLAYER_SHOOT_COOLDOWN
+    
+    def is_vulnerable(self):
+        """Returns True if the player can be hit by asteroids."""
+        return self.invulnerable_timer <= 0
+    
+    def make_invulnerable(self, duration=2.0):
+        """Make the player invulnerable for a specified duration."""
+        self.invulnerable_timer = duration
 
     def update(self, dt):
+        """Update player state, handle input, and movement."""
         if self.timer > 0:
             self.timer -= dt
+        
+        if self.invulnerable_timer > 0:
+            self.invulnerable_timer -= dt
 
         # Reset acceleration each frame
         self.acceleration = pygame.Vector2(0, 0)
