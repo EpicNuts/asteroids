@@ -13,8 +13,13 @@ class Shot(CircleShape):
         # Shot specific stuff here
 
     def draw(self, screen):
-        """Draw the shot as a white circle."""
-        pygame.draw.circle(screen, "white", self.position, self.radius, 2)
+        """Draw the enhanced shot with glow effect."""
+        # Outer glow (larger, semi-transparent)
+        pygame.draw.circle(screen, (255, 255, 150), self.position, self.radius + 2, 1)
+        # Inner bright core
+        pygame.draw.circle(screen, (255, 255, 200), self.position, self.radius)
+        # Bright center
+        pygame.draw.circle(screen, (255, 255, 255), self.position, max(1, self.radius - 1))
 
     def update(self, dt):
         """Update shot position and remove if off-screen."""

@@ -26,12 +26,26 @@ SHOT_RADIUS = 5
 # Game settings
 PLAYER_LIVES = 3
 
+# Loading screen settings
+SHOW_LOADING_SCREEN = True
+LOADING_SCREEN_TIMEOUT = 30  # Maximum time to wait for background generation
+
 # Sound settings
 MASTER_VOLUME = 0.7
 SOUND_VOLUME_SHOOT = 0.5
 SOUND_VOLUME_EXPLOSION = 0.8
 SOUND_VOLUME_THRUST = 0.3
 SOUND_VOLUME_COLLISION = 0.6
+
+# Background settings
+BACKGROUND_IMAGE_PATH = "assets/images/nebula_background.png"
+BACKGROUND_CACHE_PATH = "assets/images/nebula_cache.png"
+GENERATE_BACKGROUND_ON_STARTUP = True
+BACKGROUND_SEED = None  # None for random each time, or set an integer for reproducible background
+FORCE_REGENERATE_BACKGROUND = False  # Set to True to always generate new background
+NEBULA_THEME = None  # None for random theme, or choose: 'default', 'fire', 'ice', 'alien', 'sunset'
+BACKGROUND_GENERATION_TIMEOUT = 30  # Maximum seconds to wait for background generation
+FAST_BACKGROUND_MODE = True  # Generate smaller images and scale up for faster startup
 
 # Sound file paths
 SOUND_PATH_SHOOT = "assets/sounds/shoot.wav"

@@ -21,7 +21,7 @@ class Player(CircleShape):
         self.invulnerable_timer = 0  # Invulnerability period after respawn
 
     def triangle(self):
-        """Calculate the triangle points for drawing the ship."""
+        """Calculate the triangle points for drawing the ship body."""
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
         right = pygame.Vector2(0, 1).rotate(self.rotation + 90) * self.radius / 1.5
         a = self.position + forward * self.radius
@@ -29,15 +29,46 @@ class Player(CircleShape):
         c = self.position - forward * self.radius + right
         return [a, b, c]
     
+    def engine_triangle(self):
+        """Calculate the engine glow triangle points."""
+        forward = pygame.Vector2(0, 1).rotate(self.rotation)
+        right = pygame.Vector2(0, 1).rotate(self.rotation + 90) * self.radius / 3
+        
+        # Engine glow extends backwards from the ship
+        back_point = self.position - forward * self.radius * 1.8
+        left_point = self.position - forward * self.radius - right * 0.3
+        right_point = self.position - forward * self.radius + right * 0.3
+        
+        return [back_point, left_point, right_point]
+    
     def draw(self, screen):
-        """Draw the player ship with blinking during invulnerability."""
-        # Blink during invulnerability period
+        """Draw the enhanced player ship with engine glow."""
+        # Determine if we should draw (for blinking effect)
+        should_draw = True
         if self.invulnerable_timer > 0:
             # Blink effect - only draw every few frames
-            if int(self.invulnerable_timer * 10) % 2 == 0:
-                pygame.draw.polygon(screen, "white", self.triangle(), 2)
-        else:
-            pygame.draw.polygon(screen, "white", self.triangle(), 2)
+            should_draw = int(self.invulnerable_timer * 10) % 2 == 0
+        
+        if should_draw:
+            # Check if currently accelerating to show engine glow
+            keys = pygame.key.get_pressed()
+            is_thrusting = (keys[pygame.K_w] or keys[pygame.K_UP] or 
+                          keys[pygame.K_s] or keys[pygame.K_DOWN])
+            
+            # Draw engine glow first (behind ship) if thrusting
+            if is_thrusting:
+                engine_points = self.engine_triangle()
+                # Engine glow with orange-red color
+                pygame.draw.polygon(screen, (255, 100, 50), engine_points)
+                # Add a brighter inner glow
+                pygame.draw.polygon(screen, (255, 200, 100), engine_points, 2)
+            
+            # Draw main ship body
+            ship_points = self.triangle()
+            # Ship body with light blue color
+            pygame.draw.polygon(screen, (150, 150, 255), ship_points)
+            # Ship outline in white
+            pygame.draw.polygon(screen, "white", ship_points, 2)
 
     def rotate(self, dt):
         """Rotate the player ship."""

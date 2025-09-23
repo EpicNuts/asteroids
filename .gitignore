@@ -15,3 +15,5 @@ wheels/
 *.ogg
 *.flac
 *.m4a
+
+*.png

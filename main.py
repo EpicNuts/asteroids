@@ -3,7 +3,7 @@
 import pygame
 import sys
 from src.game.constants import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, PLAYER_LIVES, MASTER_VOLUME,
+    SCREEN_WIDTH, SCREEN_HEIGHT, PLAYER_LIVES, MASTER_VOLUME, SHOW_LOADING_SCREEN,
     SOUND_PATH_SHOOT, SOUND_PATH_EXPLOSION, SOUND_PATH_THRUST, SOUND_PATH_COLLISION,
     SOUND_VOLUME_SHOOT, SOUND_VOLUME_EXPLOSION, SOUND_VOLUME_THRUST, SOUND_VOLUME_COLLISION
 )
@@ -13,6 +13,8 @@ from src.entities.asteroid import Asteroid
 from src.entities.asteroidfield import AsteroidField
 from src.entities.shot import Shot
 from src.utils.sound import get_sound_manager
+from src.utils.background import BackgroundManager
+from src.utils.loading import LoadingScreen
 
 
 def main():
@@ -24,9 +26,48 @@ def main():
     # Initialize pygame
     pygame.init()
     
+    # Create the game window
+    GAMESCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Asteroids")
+    
     # Initialize sound system
     sound_manager = get_sound_manager()
     sound_manager.set_master_volume(MASTER_VOLUME)
+    
+    # Initialize background system (starts generation in background)
+    background_manager = BackgroundManager()
+    background_manager.initialize()
+    
+    # Show loading screen if enabled
+    if SHOW_LOADING_SCREEN:
+        loading_screen = LoadingScreen(GAMESCREEN, background_manager)
+        clock = pygame.time.Clock()
+        
+        print("Showing loading screen...")
+        
+        # Loading screen loop
+        while True:
+            # Handle events during loading
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        print("Loading skipped by user")
+                        background_manager.use_fallback()
+                        break
+            
+            # Update and draw loading screen
+            loading_complete = loading_screen.update_and_draw()
+            
+            pygame.display.flip()
+            clock.tick(60)
+            
+            if loading_complete:
+                break
+        
+        print("Loading complete, starting game!")
     
     # Load sound effects
     sound_manager.load_sound("shoot", SOUND_PATH_SHOOT, SOUND_VOLUME_SHOOT)
@@ -38,10 +79,6 @@ def main():
     pygame.font.init()
     font = pygame.font.Font(None, 74)  # Large font for game over
     ui_font = pygame.font.Font(None, 36)  # Smaller font for UI
-
-    # Create the game window
-    GAMESCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Asteroids")
 
     # Create sprite groups
     updatable = pygame.sprite.Group()
@@ -82,8 +119,8 @@ def main():
 
         dt = clock.tick(60) / 1000  # Amount of seconds between each loop
         
-        # Clear the screen
-        GAMESCREEN.fill('black')
+        # Render background
+        background_manager.render(GAMESCREEN)
         
         if game_state == GameState.PLAYING:
             # Update the game objects
@@ -118,6 +155,15 @@ def main():
             
             # Draw UI elements
             draw_lives(GAMESCREEN, lives, ui_font)
+            
+            # Show background generation status (small indicator)
+            if background_manager.is_background_generating():
+                status_text = ui_font.render("Generating new nebula...", True, (100, 150, 255))
+                GAMESCREEN.blit(status_text, (10, SCREEN_HEIGHT - 40))
+            elif background_manager.is_generation_complete():
+                # Show "New background ready!" message briefly
+                status_text = ui_font.render("New nebula ready!", True, (100, 255, 100))
+                GAMESCREEN.blit(status_text, (10, SCREEN_HEIGHT - 40))
             
         elif game_state == GameState.GAME_OVER:
             # Draw game over screen
