@@ -8,3 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
+
+# unlicensed files
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.m4a
