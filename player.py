@@ -75,6 +75,9 @@ class Player(CircleShape):
         # Update position based on velocity
         self.position += self.velocity * dt
 
+        # Add screen wrapping for player
+        self.wrap_around_screen()
+
         if keys[pygame.K_SPACE]:
             # shoot
             if self.timer <= 0:

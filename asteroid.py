@@ -30,4 +30,5 @@ class Asteroid(CircleShape):
 
     def update(self, dt):
         self.position += self.velocity * dt
-        # Add screen wrapping logic here if needed
+        # Add screen wrapping for asteroids
+        self.wrap_around_screen()
