@@ -201,18 +201,15 @@ class BackgroundManager:
         self._create_fallback_background_on_surface(self.background_surface)
     
     def initialize(self) -> None:
-        """Initialize the background system with loading screen support."""
+        """Initialize the background system."""
         # Ensure assets directory exists
         os.makedirs(os.path.dirname(BACKGROUND_IMAGE_PATH), exist_ok=True)
-        
-        # Create loading screen immediately
-        self.loading_surface = self._create_loading_screen()
         
         # Try to load existing background for immediate display
         if os.path.exists(BACKGROUND_IMAGE_PATH):
             if self._load_background_image():
                 self.background_loaded = True
-                print("Loaded existing background for immediate display")
+                print("Background image loaded successfully!")
         
         # If no background exists, create fallback
         if not self.background_loaded:
@@ -238,10 +235,7 @@ class BackgroundManager:
         Args:
             screen: The pygame surface to render to.
         """
-        if self.is_generating and self.loading_surface:
-            # Show loading screen while generating
-            screen.blit(self.loading_surface, (0, 0))
-        elif self.generation_complete and self.background_surface:
+        if self.generation_complete and self.background_surface:
             # Switch to new background when generation is complete
             screen.blit(self.background_surface, (0, 0))
             # Mark as no longer generating

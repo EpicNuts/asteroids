@@ -156,15 +156,6 @@ def main():
             # Draw UI elements
             draw_lives(GAMESCREEN, lives, ui_font)
             
-            # Show background generation status (small indicator)
-            if background_manager.is_background_generating():
-                status_text = ui_font.render("Generating new nebula...", True, (100, 150, 255))
-                GAMESCREEN.blit(status_text, (10, SCREEN_HEIGHT - 40))
-            elif background_manager.is_generation_complete():
-                # Show "New background ready!" message briefly
-                status_text = ui_font.render("New nebula ready!", True, (100, 255, 100))
-                GAMESCREEN.blit(status_text, (10, SCREEN_HEIGHT - 40))
-            
         elif game_state == GameState.GAME_OVER:
             # Draw game over screen
             draw_game_over(GAMESCREEN, font)

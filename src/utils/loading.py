@@ -40,13 +40,14 @@ class LoadingScreen:
         self.shot_color = (255, 255, 100)
         self.asteroid_color = (150, 100, 80)
         
-        # Animation setup
-        self.animation_start_x = 100
-        self.animation_end_x = SCREEN_WIDTH - 200
-        self.animation_y = SCREEN_HEIGHT - 80
+        # Animation setup - better centered with original distance
+        animation_width = 1000  # Wider animation area to restore original distance
+        self.animation_start_x = (SCREEN_WIDTH - animation_width) // 2 + 50  # Start position with some margin
+        self.animation_end_x = (SCREEN_WIDTH + animation_width) // 2 - 50    # End position with some margin
+        self.animation_y = SCREEN_HEIGHT - 120
         self.asteroid_x = self.animation_end_x
-        self.ship_size = 15
-        self.asteroid_size = 25
+        self.ship_size = 25  # Larger ship
+        self.asteroid_size = 40  # Larger asteroid
         
         # Animation state
         self.shot_fired = False
@@ -68,29 +69,38 @@ class LoadingScreen:
             pygame.draw.circle(self.screen, (brightness, brightness, brightness), (x, y), 1)
     
     def _draw_ship(self, x: int, y: int) -> None:
-        """Draw an enhanced ship sprite facing right (matching game style)."""
-        # Ship body (triangle pointing right)
-        points = [
-            (x + self.ship_size, y),  # Tip
-            (x - self.ship_size, y - self.ship_size//2),  # Top back
-            (x - self.ship_size//2, y),  # Middle back
-            (x - self.ship_size, y + self.ship_size//2),  # Bottom back
-        ]
+        """Draw an enhanced ship sprite facing right (exactly matching game style)."""
+        # Use the same triangle calculation as the game
+        # For the loading screen, ship faces right (90° rotation from game's upward facing)
+        rotation = -90  # Face right instead of up
+        radius = self.ship_size
         
-        # Engine glow (always show for loading screen ship)
-        engine_points = [
-            (x - self.ship_size, y - 3),
-            (x - self.ship_size - 10, y),  # Longer engine glow
-            (x - self.ship_size, y + 3),
-        ]
+        # Calculate triangle points using the same method as the game
+        import math
+        forward = pygame.Vector2(0, 1)
+        forward = forward.rotate(rotation)
+        right = pygame.Vector2(0, 1).rotate(rotation + 90) * radius / 1.5
         
-        # Draw engine glow first (behind ship)
+        position = pygame.Vector2(x, y)
+        a = position + forward * radius  # Tip
+        b = position - forward * radius - right  # Top back
+        c = position - forward * radius + right  # Bottom back
+        ship_points = [a, b, c]
+        
+        # Calculate engine glow triangle using the same method as the game
+        right_engine = pygame.Vector2(0, 1).rotate(rotation + 90) * radius / 3
+        back_point = position - forward * radius * 1.8
+        left_point = position - forward * radius - right_engine * 0.3
+        right_point = position - forward * radius + right_engine * 0.3
+        engine_points = [back_point, left_point, right_point]
+        
+        # Draw engine glow first (behind ship) - always show for loading screen
         pygame.draw.polygon(self.screen, (255, 100, 50), engine_points)
         pygame.draw.polygon(self.screen, (255, 200, 100), engine_points, 2)
         
-        # Draw ship body
-        pygame.draw.polygon(self.screen, (150, 150, 255), points)
-        pygame.draw.polygon(self.screen, (255, 255, 255), points, 2)
+        # Draw ship body (exactly matching game colors)
+        pygame.draw.polygon(self.screen, (150, 150, 255), ship_points)
+        pygame.draw.polygon(self.screen, "white", ship_points, 2)
     
     def _draw_asteroid(self, x: int, y: int, size: int = None, offset: tuple = (0, 0)) -> None:
         """Draw an irregular asteroid sprite (matching game style)."""
@@ -116,12 +126,13 @@ class LoadingScreen:
     
     def _draw_shot(self, x: int, y: int) -> None:
         """Draw an enhanced shot sprite (matching game style)."""
+        # Larger shot to match the larger ship
         # Outer glow (larger, semi-transparent)
-        pygame.draw.circle(self.screen, (255, 255, 150), (int(x), int(y)), 5, 1)
+        pygame.draw.circle(self.screen, (255, 255, 150), (int(x), int(y)), 8, 1)
         # Inner bright core
-        pygame.draw.circle(self.screen, (255, 255, 200), (int(x), int(y)), 3)
+        pygame.draw.circle(self.screen, (255, 255, 200), (int(x), int(y)), 5)
         # Bright center
-        pygame.draw.circle(self.screen, (255, 255, 255), (int(x), int(y)), 2)
+        pygame.draw.circle(self.screen, (255, 255, 255), (int(x), int(y)), 3)
     
     def _update_animation(self) -> float:
         """Update the ship/shot/asteroid animation and return progress (0.0 to 1.0)."""
@@ -137,8 +148,8 @@ class LoadingScreen:
         if shot_travel_progress < 1.0:
             # Shot is traveling
             self.shot_fired = True
-            distance = self.asteroid_x - self.animation_start_x - 30  # 30 = ship length
-            self.shot_x = self.animation_start_x + 30 + (distance * shot_travel_progress)
+            distance = self.asteroid_x - self.animation_start_x - self.ship_size  # Use ship_size for accuracy
+            self.shot_x = self.animation_start_x + self.ship_size + (distance * shot_travel_progress)
             self.collision_happened = False
         else:
             # Phase 2: Asteroid splits (95% to 100%)
@@ -202,8 +213,26 @@ class LoadingScreen:
             print("Loading timeout reached, proceeding with fallback background")
             return True
         
-        # Clear screen with deep space color
-        self.screen.fill((5, 5, 15))
+        # Clear screen with Trifid Nebula background or deep space color
+        try:
+            # Try to load the Trifid Nebula image
+            nebula_path = "assets/images/Trifid_Nebula_by_Deddy_Dayag.jpg"
+            if hasattr(self, '_nebula_background'):
+                # Use cached nebula background
+                self.screen.blit(self._nebula_background, (0, 0))
+            else:
+                # Load and cache the nebula background
+                import os
+                if os.path.exists(nebula_path):
+                    nebula_img = pygame.image.load(nebula_path)
+                    self._nebula_background = pygame.transform.scale(nebula_img, (SCREEN_WIDTH, SCREEN_HEIGHT))
+                    self.screen.blit(self._nebula_background, (0, 0))
+                else:
+                    # Fallback to deep space color
+                    self.screen.fill((5, 5, 15))
+        except Exception as e:
+            # Fallback to deep space color if loading fails
+            self.screen.fill((5, 5, 15))
         
         # Draw animated starfield
         self._draw_starfield()
