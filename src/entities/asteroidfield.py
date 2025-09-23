@@ -2,7 +2,7 @@
 
 import pygame
 import random
-from .asteroid import Asteroid
+from .asteroid import Asteroid, AnimatedAsteroid
 from ..game.constants import (
     ASTEROID_MAX_RADIUS, SCREEN_HEIGHT, SCREEN_WIDTH, ASTEROID_SPAWN_RATE,
     ASTEROID_KINDS, ASTEROID_MIN_RADIUS
@@ -41,7 +41,16 @@ class AsteroidField(pygame.sprite.Sprite):
 
     def spawn(self, radius, position, velocity):
         """Spawn a new asteroid with given parameters."""
-        asteroid = Asteroid(position.x, position.y, radius)
+        # Determine size based on radius
+        if radius >= 35:
+            size = AnimatedAsteroid.SIZE_LARGE
+        elif radius >= 20:
+            size = AnimatedAsteroid.SIZE_MEDIUM
+        else:
+            size = AnimatedAsteroid.SIZE_SMALL
+            
+        # Use AnimatedAsteroid instead of basic Asteroid
+        asteroid = AnimatedAsteroid(position.x, position.y, size)
         asteroid.velocity = velocity
 
     def update(self, dt):

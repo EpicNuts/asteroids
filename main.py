@@ -9,7 +9,7 @@ from src.game.constants import (
 )
 from src.game.states import GameState, reset_game, draw_lives, draw_game_over
 from src.entities.player import Player
-from src.entities.asteroid import Asteroid
+from src.entities.asteroid import Asteroid, AnimatedAsteroid
 from src.entities.asteroidfield import AsteroidField
 from src.entities.shot import Shot
 from src.utils.sound import get_sound_manager
@@ -91,6 +91,7 @@ def main():
     Player.containers = updatable, drawable
     Shot.containers = updatable, drawable, shots
     Asteroid.containers = updatable, drawable, asteroids
+    AnimatedAsteroid.containers = updatable, drawable, asteroids
     AsteroidField.containers = updatable
 
     # Create the game objects
@@ -150,7 +151,13 @@ def main():
                 for asteroid in asteroids:
                     if shot.collision(asteroid):
                         shot.kill()
-                        asteroid.split()
+                        new_asteroids = asteroid.split()
+                        # Add any new smaller asteroids to the game
+                        if new_asteroids:
+                            for new_asteroid in new_asteroids:
+                                asteroids.add(new_asteroid)
+                                updatable.add(new_asteroid)
+                                drawable.add(new_asteroid)
                         break 
 
             # Render the sprites
