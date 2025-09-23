@@ -46,16 +46,17 @@ def main():
         print("Showing loading screen...")
         
         # Loading screen loop
-        while True:
+        loading_done = False
+        while not loading_done:
             # Handle events during loading
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        print("Loading skipped by user")
-                        background_manager.use_fallback()
+                    if event.key == pygame.K_SPACE or event.key == pygame.K_ESCAPE:
+                        print("Loading screen completed by user")
+                        loading_done = True
                         break
             
             # Update and draw loading screen
@@ -65,7 +66,7 @@ def main():
             clock.tick(60)
             
             if loading_complete:
-                break
+                loading_done = True
         
         print("Loading complete, starting game!")
     
@@ -116,6 +117,9 @@ def main():
                     game_state = GameState.PLAYING
                     lives = PLAYER_LIVES
                     reset_game(player, asteroidfield, shots, asteroids)
+                elif event.key == pygame.K_b and game_state == GameState.PLAYING:
+                    # Change background during gameplay
+                    background_manager.regenerate_background()
 
         dt = clock.tick(60) / 1000  # Amount of seconds between each loop
         

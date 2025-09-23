@@ -2,303 +2,217 @@
 
 import os
 import pygame
-import subprocess
-import sys
-import threading
-import time
-from typing import Optional
+import random
+from typing import Optional, List
 
 from ..game.constants import (
-    BACKGROUND_IMAGE_PATH,
-    BACKGROUND_CACHE_PATH, 
-    GENERATE_BACKGROUND_ON_STARTUP,
-    BACKGROUND_SEED,
-    FORCE_REGENERATE_BACKGROUND,
-    NEBULA_THEME,
-    BACKGROUND_GENERATION_TIMEOUT,
     SCREEN_WIDTH,
     SCREEN_HEIGHT
 )
 
+# Loading screen uses the Trifid Nebula
+LOADING_BACKGROUND_PATH = os.path.join("assets", "images", "Trifid_Nebula_by_Deddy_Dayag.jpg")
+
+# Image extensions to look for
+SUPPORTED_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp', '.tga')
+
+def get_available_background_images() -> List[str]:
+    """
+    Dynamically discover available background images, excluding the Trifid Nebula.
+    
+    Returns:
+        List of image filenames available for game backgrounds
+    """
+    images_folder = os.path.join("assets", "images")
+    trifid_filename = "Trifid_Nebula_by_Deddy_Dayag.jpg"
+    
+    available_images = []
+    
+    try:
+        if os.path.exists(images_folder):
+            for filename in os.listdir(images_folder):
+                # Check if it's a supported image file
+                if filename.lower().endswith(SUPPORTED_EXTENSIONS):
+                    # Exclude the Trifid Nebula (reserved for loading screen)
+                    if filename != trifid_filename:
+                        available_images.append(filename)
+            
+            available_images.sort()  # Sort for consistent ordering
+            print(f"Found {len(available_images)} background images: {available_images}")
+        else:
+            print(f"Images folder not found: {images_folder}")
+    
+    except Exception as e:
+        print(f"Error scanning for background images: {e}")
+    
+    return available_images
+
 
 class BackgroundManager:
-    """Manages the game background image with loading screen support."""
+    """Manages the game background image."""
     
     def __init__(self):
         """Initialize the background manager."""
         self.background_surface: Optional[pygame.Surface] = None
-        self.loading_surface: Optional[pygame.Surface] = None
+        self.loading_background_surface: Optional[pygame.Surface] = None
         self.background_loaded = False
-        self.is_generating = False
-        self.generation_complete = False
-        self.generation_thread = None
-        
-    def _create_loading_screen(self) -> pygame.Surface:
-        """Create a loading screen with title and previous background."""
-        loading_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        
-        # Try to load previous background as loading screen
-        if os.path.exists(BACKGROUND_CACHE_PATH):
-            try:
-                bg_img = pygame.image.load(BACKGROUND_CACHE_PATH)
-                bg_scaled = pygame.transform.scale(bg_img, (SCREEN_WIDTH, SCREEN_HEIGHT))
-                loading_surface.blit(bg_scaled, (0, 0))
-            except:
-                # Fallback to simple gradient
-                self._create_fallback_background_on_surface(loading_surface)
-        else:
-            # No previous background, use simple gradient
-            self._create_fallback_background_on_surface(loading_surface)
-        
-        # Add dark overlay for text readability
-        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        overlay.set_alpha(100)
-        overlay.fill((0, 0, 0))
-        loading_surface.blit(overlay, (0, 0))
-        
-        # Add title text
-        try:
-            title_font = pygame.font.Font(None, 120)
-            subtitle_font = pygame.font.Font(None, 48)
-            
-            # Main title
-            title_text = title_font.render("ASTEROIDS", True, (255, 255, 255))
-            title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
-            loading_surface.blit(title_text, title_rect)
-            
-            # Loading subtitle
-            loading_text = subtitle_font.render("Generating nebula...", True, (200, 200, 255))
-            loading_rect = loading_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
-            loading_surface.blit(loading_text, loading_rect)
-            
-        except:
-            # Fallback if font loading fails
-            pass
-        
-        return loading_surface
+        self.selected_image_path: Optional[str] = None
+        self.available_images: List[str] = []
     
-    def _create_fallback_background_on_surface(self, surface: pygame.Surface) -> None:
-        """Create a simple fallback background directly on a surface."""
-        # Dark space background with subtle gradient
-        for y in range(SCREEN_HEIGHT):
-            color_value = max(0, 15 - (y * 15 // SCREEN_HEIGHT))
-            color = (color_value, color_value, color_value + 5)
-            pygame.draw.line(surface, color, (0, y), (SCREEN_WIDTH, y))
-    
-    def _generate_background_threaded(self) -> None:
-        """Generate background in a separate thread."""
-        try:
-            success = self._generate_background()
-            if success:
-                # Cache the new background for next time
-                if os.path.exists(BACKGROUND_IMAGE_PATH):
-                    # Copy current background to cache
-                    import shutil
-                    shutil.copy2(BACKGROUND_IMAGE_PATH, BACKGROUND_CACHE_PATH)
-                
-                # Load the new background
-                if self._load_background_image():
-                    self.generation_complete = True
-        except Exception as e:
-            print(f"Background generation failed: {e}")
-        finally:
-            self.is_generating = False
-    
-    def _generate_background(self) -> bool:
+    def _crop_and_scale_image(self, image_path: str, target_width: int, target_height: int) -> Optional[pygame.Surface]:
         """
-        Generate a new nebula background using the image generation tool.
+        Load and crop an image to fit the target dimensions without stretching.
         
+        Args:
+            image_path: Path to the image file
+            target_width: Target width
+            target_height: Target height
+            
         Returns:
-            True if generation was successful, False otherwise.
+            Cropped and scaled pygame surface, or None if loading fails
         """
         try:
-            # Path to the nebula generator
-            generator_path = os.path.join("tools", "image_generation", "create_nebula.py")
+            # Load the original image
+            original_image = pygame.image.load(image_path)
+            orig_width, orig_height = original_image.get_size()
             
-            if not os.path.exists(generator_path):
-                print(f"Warning: Nebula generator not found at {generator_path}")
-                return False
+            # Calculate aspect ratios
+            target_ratio = target_width / target_height
+            orig_ratio = orig_width / orig_height
             
-            # Build command
-            cmd = [
-                sys.executable, generator_path,
-                "--width", str(SCREEN_WIDTH),
-                "--height", str(SCREEN_HEIGHT),
-                "--output", BACKGROUND_IMAGE_PATH
-            ]
-            
-            # Add seed if specified
-            if BACKGROUND_SEED is not None:
-                cmd.extend(["--seed", str(BACKGROUND_SEED)])
-            
-            # Add theme
-            if NEBULA_THEME is not None:
-                cmd.extend(["--theme", NEBULA_THEME])
-                print(f"Generating {NEBULA_THEME} themed nebula background...")
+            if orig_ratio > target_ratio:
+                # Image is wider than target - crop horizontally
+                new_height = orig_height
+                new_width = int(orig_height * target_ratio)
+                crop_x = (orig_width - new_width) // 2
+                crop_y = 0
             else:
-                # Random theme selection
-                import random
-                themes = ['default', 'fire', 'ice', 'alien', 'sunset']
-                chosen_theme = random.choice(themes)
-                cmd.extend(["--theme", chosen_theme])
-                print(f"Generating random {chosen_theme} themed nebula background...")
+                # Image is taller than target - crop vertically  
+                new_width = orig_width
+                new_height = int(orig_width / target_ratio)
+                crop_x = 0
+                crop_y = (orig_height - new_height) // 2
             
-            # Run the generator with timeout
-            result = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True, 
-                cwd=".",
-                timeout=BACKGROUND_GENERATION_TIMEOUT
-            )
+            # Create cropped surface
+            cropped_rect = pygame.Rect(crop_x, crop_y, new_width, new_height)
+            cropped_surface = pygame.Surface((new_width, new_height))
+            cropped_surface.blit(original_image, (0, 0), cropped_rect)
             
-            if result.returncode == 0:
-                print("Nebula background generated successfully!")
-                return True
-            else:
-                print(f"Error generating background: {result.stderr}")
-                return False
-                
-        except subprocess.TimeoutExpired:
-            print(f"Background generation timed out after {BACKGROUND_GENERATION_TIMEOUT} seconds")
-            return False
-        except Exception as e:
-            print(f"Failed to generate background: {e}")
-            return False
-    
-    def _load_background_image(self) -> bool:
-        """
-        Load the background image from file.
-        
-        Returns:
-            True if loading was successful, False otherwise.
-        """
-        try:
-            if not os.path.exists(BACKGROUND_IMAGE_PATH):
-                print(f"Background image not found at {BACKGROUND_IMAGE_PATH}")
-                return False
+            # Scale to target size
+            scaled_surface = pygame.transform.scale(cropped_surface, (target_width, target_height))
             
-            # Load and scale the image
-            background_img = pygame.image.load(BACKGROUND_IMAGE_PATH)
-            self.background_surface = pygame.transform.scale(
-                background_img, 
-                (SCREEN_WIDTH, SCREEN_HEIGHT)
-            )
-            
-            print("Background image loaded successfully!")
-            return True
+            return scaled_surface
             
         except Exception as e:
-            print(f"Error loading background image: {e}")
-            return False
+            print(f"Error processing image {image_path}: {e}")
+            return None
     
     def _create_fallback_background(self) -> None:
-        """Create a simple fallback background if image generation fails."""
-        print("Creating fallback background...")
+        """Create a simple fallback background if image loading fails."""
+        surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         
-        # Create a simple gradient background
-        self.background_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self._create_fallback_background_on_surface(self.background_surface)
+        # Dark space background with subtle gradient
+        for y in range(SCREEN_HEIGHT):
+            color_value = max(0, 20 - (y * 20 // SCREEN_HEIGHT))
+            color = (color_value, color_value, color_value + 10)
+            pygame.draw.line(surface, color, (0, y), (SCREEN_WIDTH, y))
+            
+        # Add some stars
+        random.seed(42)  # Consistent star field
+        for _ in range(200):
+            x = random.randint(0, SCREEN_WIDTH)
+            y = random.randint(0, SCREEN_HEIGHT)
+            brightness = random.randint(100, 255)
+            size = random.choice([1, 1, 1, 2])  # Mostly small stars
+            color = (brightness, brightness, brightness)
+            
+            if size == 1:
+                surface.set_at((x, y), color)
+            else:
+                pygame.draw.circle(surface, color, (x, y), size)
+        
+        self.background_surface = surface
+        self.background_loaded = True
+        print("Created fallback background")
     
     def initialize(self) -> None:
-        """Initialize the background system."""
-        # Ensure assets directory exists
-        os.makedirs(os.path.dirname(BACKGROUND_IMAGE_PATH), exist_ok=True)
+        """Initialize the background images."""
+        # Discover available background images
+        self.available_images = get_available_background_images()
         
-        # Try to load existing background for immediate display
-        if os.path.exists(BACKGROUND_IMAGE_PATH):
-            if self._load_background_image():
-                self.background_loaded = True
-                print("Background image loaded successfully!")
+        if not self.available_images:
+            print("Warning: No background images found! Using fallback background.")
         
-        # If no background exists, create fallback
-        if not self.background_loaded:
+        # Load the loading screen background (always Trifid Nebula)
+        self._load_loading_background()
+        
+        # Randomly select and load a game background
+        self._load_random_game_background()
+    
+    def _load_loading_background(self) -> None:
+        """Load the loading screen background (Trifid Nebula, uncropped)."""
+        try:
+            if os.path.exists(LOADING_BACKGROUND_PATH):
+                # Load and scale Trifid without cropping (preserve aspect ratio)
+                original_image = pygame.image.load(LOADING_BACKGROUND_PATH)
+                self.loading_background_surface = pygame.transform.scale(
+                    original_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
+                )
+                print("Loading screen background loaded successfully (uncropped)")
+            else:
+                print(f"Loading background not found at {LOADING_BACKGROUND_PATH}")
+        except Exception as e:
+            print(f"Error loading loading background: {e}")
+    
+    def _load_random_game_background(self) -> None:
+        """Randomly select and load a game background."""
+        if not self.available_images:
+            print("No background images available, using fallback")
             self._create_fallback_background()
-            self.background_loaded = True
-        
-        # Start background generation in thread if needed
-        should_generate = (GENERATE_BACKGROUND_ON_STARTUP and 
-                          (FORCE_REGENERATE_BACKGROUND or 
-                           BACKGROUND_SEED is None))
-        
-        if should_generate:
-            print("Starting background generation in thread...")
-            self.is_generating = True
-            self.generation_thread = threading.Thread(target=self._generate_background_threaded)
-            self.generation_thread.daemon = True
-            self.generation_thread.start()
-    
-    def render(self, screen: pygame.Surface) -> None:
-        """
-        Render the appropriate background to the screen.
-        
-        Args:
-            screen: The pygame surface to render to.
-        """
-        if self.generation_complete and self.background_surface:
-            # Switch to new background when generation is complete
-            screen.blit(self.background_surface, (0, 0))
-            # Mark as no longer generating
-            if self.is_generating:
-                self.is_generating = False
-                print("New background loaded!")
-        elif self.background_surface and self.background_loaded:
-            # Show current background
-            screen.blit(self.background_surface, (0, 0))
-        else:
-            # Emergency fallback - fill with black
-            screen.fill((0, 0, 0))
-    
-    def is_background_generating(self) -> bool:
-        """Check if background is currently being generated."""
-        return self.is_generating
-    
-    def is_generation_complete(self) -> bool:
-        """Check if new background generation is complete."""
-        return self.generation_complete
-    
-    def get_generation_status(self) -> str:
-        """Get a human-readable generation status."""
-        if self.is_generating:
-            return "Generating new nebula..."
-        elif self.generation_complete:
-            return "New background ready!"
-        else:
-            return "Background ready"
-    
-    def is_generation_complete(self) -> bool:
-        """Check if background generation is complete."""
-        return not getattr(self, 'is_generating', False)
-    
-    def use_fallback(self) -> None:
-        """Force use of fallback background and stop generation."""
-        if hasattr(self, 'is_generating'):
-            self.is_generating = False
-        if not self.background_loaded:
-            self._create_fallback_background()
-            self.background_loaded = True
-    
-    def regenerate_background(self, new_seed: Optional[int] = None) -> bool:
-        """
-        Regenerate the background with a new seed.
-        
-        Args:
-            new_seed: Optional seed for reproducible generation.
+            return
             
-        Returns:
-            True if regeneration was successful.
-        """
-        # Temporarily override the seed by modifying the constants module
-        from ..game import constants
-        original_seed = constants.BACKGROUND_SEED
+        # Randomly select an image from the available ones
+        selected_image = random.choice(self.available_images)
+        self.selected_image_path = os.path.join("assets", "images", selected_image)
         
-        if new_seed is not None:
-            constants.BACKGROUND_SEED = new_seed
+        print(f"Randomly selected background: {selected_image}")
         
         try:
-            success = self._generate_background() and self._load_background_image()
-            return success
-        finally:
-            # Restore original seed
-            if new_seed is not None:
-                constants.BACKGROUND_SEED = original_seed
+            if os.path.exists(self.selected_image_path):
+                # Load and crop the image properly
+                self.background_surface = self._crop_and_scale_image(
+                    self.selected_image_path, SCREEN_WIDTH, SCREEN_HEIGHT
+                )
+                
+                if self.background_surface:
+                    self.background_loaded = True
+                    print("Game background loaded and cropped successfully")
+                else:
+                    raise Exception("Failed to process image")
+            else:
+                print(f"Selected background not found at {self.selected_image_path}")
+                self._create_fallback_background()
+        except Exception as e:
+            print(f"Error loading game background: {e}")
+            self._create_fallback_background()
+    
+    def render(self, screen: pygame.Surface) -> None:
+        """Render the background to the screen."""
+        if self.background_surface:
+            screen.blit(self.background_surface, (0, 0))
+        else:
+            # Emergency fallback - just fill with black
+            screen.fill((0, 0, 0))
+    
+    def is_background_ready(self) -> bool:
+        """Check if the background is ready to use."""
+        return self.background_loaded
+    
+    def get_loading_background(self) -> Optional[pygame.Surface]:
+        """Get the loading screen background surface."""
+        return self.loading_background_surface
+    
+    def regenerate_background(self) -> None:
+        """Select and load a new random background."""
+        print("Regenerating background...")
+        self._load_random_game_background()

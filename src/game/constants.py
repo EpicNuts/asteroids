@@ -44,7 +44,7 @@ GENERATE_BACKGROUND_ON_STARTUP = True
 BACKGROUND_SEED = None  # None for random each time, or set an integer for reproducible background
 FORCE_REGENERATE_BACKGROUND = False  # Set to True to always generate new background
 NEBULA_THEME = None  # None for random theme, or choose: 'default', 'fire', 'ice', 'alien', 'sunset'
-BACKGROUND_GENERATION_TIMEOUT = 30  # Maximum seconds to wait for background generation
+BACKGROUND_GENERATION_TIMEOUT = 60  # Increased timeout for large images
 FAST_BACKGROUND_MODE = True  # Generate smaller images and scale up for faster startup
 
 # Sound file paths

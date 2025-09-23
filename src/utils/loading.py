@@ -6,7 +6,7 @@ import time
 from typing import Optional
 
 from ..game.constants import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, LOADING_SCREEN_TIMEOUT
+    SCREEN_WIDTH, SCREEN_HEIGHT
 )
 
 
@@ -138,8 +138,9 @@ class LoadingScreen:
         """Update the ship/shot/asteroid animation and return progress (0.0 to 1.0)."""
         elapsed = time.time() - self.start_time
         
-        # Animation should complete in 90% of loading time, leaving 10% buffer
-        total_animation_time = LOADING_SCREEN_TIMEOUT * 0.9
+        # Fixed animation duration since no background generation
+        total_animation_time = 3.0
+        
         progress = min(1.0, elapsed / total_animation_time)
         
         # Phase 1: Shot travels to asteroid (0% to 95%)
@@ -204,34 +205,15 @@ class LoadingScreen:
             True if loading is complete, False if still loading
         """
         # Check if background generation is complete
-        if self.background_manager.is_generation_complete():
-            return True
-        
-        # Check for timeout
+        # Check elapsed time
         elapsed = time.time() - self.start_time
-        if elapsed > LOADING_SCREEN_TIMEOUT:
-            print("Loading timeout reached, proceeding with fallback background")
-            return True
         
         # Clear screen with Trifid Nebula background or deep space color
-        try:
-            # Try to load the Trifid Nebula image
-            nebula_path = "assets/images/Trifid_Nebula_by_Deddy_Dayag.jpg"
-            if hasattr(self, '_nebula_background'):
-                # Use cached nebula background
-                self.screen.blit(self._nebula_background, (0, 0))
-            else:
-                # Load and cache the nebula background
-                import os
-                if os.path.exists(nebula_path):
-                    nebula_img = pygame.image.load(nebula_path)
-                    self._nebula_background = pygame.transform.scale(nebula_img, (SCREEN_WIDTH, SCREEN_HEIGHT))
-                    self.screen.blit(self._nebula_background, (0, 0))
-                else:
-                    # Fallback to deep space color
-                    self.screen.fill((5, 5, 15))
-        except Exception as e:
-            # Fallback to deep space color if loading fails
+        loading_bg = self.background_manager.get_loading_background()
+        if loading_bg:
+            self.screen.blit(loading_bg, (0, 0))
+        else:
+            # Fallback to deep space color
             self.screen.fill((5, 5, 15))
         
         # Draw animated starfield
@@ -257,8 +239,16 @@ class LoadingScreen:
         # Draw the ship shooting asteroid animation
         animation_progress = self._draw_animation()
         
-        # Check if animation is complete (means loading should be done soon)
-        if animation_progress >= 1.0:
-            return True
+        # Show "Press SPACE to start" message after animation completes or 3 seconds
+        if animation_progress >= 1.0 or elapsed >= 3.0:
+            try:
+                message_font = pygame.font.Font(None, 48)
+                message_text = "Press SPACE to start"
+                message_surface = message_font.render(message_text, True, (255, 255, 255))
+                message_rect = message_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80))
+                self.screen.blit(message_surface, message_rect)
+            except:
+                pass
         
+        # Never auto-complete - wait for user input
         return False
