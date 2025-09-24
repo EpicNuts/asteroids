@@ -15,6 +15,8 @@ from src.entities.shot import Shot
 from src.utils.sound import get_sound_manager
 from src.utils.background import BackgroundManager
 from src.utils.loading import LoadingScreen
+from src.utils.asset_manager import asset_manager
+from src.utils.graphics_manager import graphics_manager
 
 
 def main():
@@ -30,6 +32,9 @@ def main():
     GAMESCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Asteroids")
     
+    # Initialize graphics manager after display is set
+    graphics_manager.initialize()
+    
     # Initialize sound system
     sound_manager = get_sound_manager()
     sound_manager.set_master_volume(MASTER_VOLUME)
@@ -37,6 +42,10 @@ def main():
     # Initialize background system (starts generation in background)
     background_manager = BackgroundManager()
     background_manager.initialize()
+    
+    # Start asset preloading
+    print("Starting asset preloading...")
+    asset_loading_thread = asset_manager.preload_assets_async()
     
     # Show loading screen if enabled
     if SHOW_LOADING_SCREEN:
@@ -55,9 +64,11 @@ def main():
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE or event.key == pygame.K_ESCAPE:
-                        print("Loading screen completed by user")
-                        loading_done = True
-                        break
+                        # Only allow exit if assets are loaded
+                        if asset_manager.is_loading_complete():
+                            print("Loading screen completed by user")
+                            loading_done = True
+                            break
             
             # Update and draw loading screen
             loading_complete = loading_screen.update_and_draw()
@@ -121,11 +132,19 @@ def main():
                 elif event.key == pygame.K_b and game_state == GameState.PLAYING:
                     # Change background during gameplay
                     background_manager.regenerate_background()
+                elif event.key == pygame.K_g and game_state == GameState.PLAYING:
+                    # Cycle through graphics modes
+                    graphics_manager.cycle_mode()
 
         dt = clock.tick(60) / 1000  # Amount of seconds between each loop
         
-        # Render background
-        background_manager.render(GAMESCREEN)
+        # Render background based on graphics mode
+        if graphics_manager.should_show_background_image():
+            background_manager.render(GAMESCREEN)
+        else:
+            # Fill with solid color based on graphics mode
+            bg_color = graphics_manager.get_background_color()
+            GAMESCREEN.fill(bg_color)
         
         if game_state == GameState.PLAYING:
             # Update the game objects
@@ -166,6 +185,11 @@ def main():
             
             # Draw UI elements
             draw_lives(GAMESCREEN, lives, ui_font)
+            
+            # Draw graphics mode indicator
+            mode_text = f"Graphics: {graphics_manager.get_current_mode().value.upper()} (Press G to change)"
+            mode_surface = pygame.font.Font(None, 24).render(mode_text, True, (200, 200, 200))
+            GAMESCREEN.blit(mode_surface, (10, SCREEN_HEIGHT - 30))
             
         elif game_state == GameState.GAME_OVER:
             # Draw game over screen

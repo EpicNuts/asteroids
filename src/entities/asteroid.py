@@ -7,6 +7,8 @@ import os
 from .base import CircleShape
 from ..game.constants import ASTEROID_MIN_RADIUS
 from ..utils.sound import play_sound
+from ..utils.asset_manager import asset_manager
+from ..utils.graphics_manager import graphics_manager
 
 
 class AnimatedAsteroid(CircleShape):
@@ -20,13 +22,6 @@ class AnimatedAsteroid(CircleShape):
     SIZE_MEDIUM = "medium" 
     SIZE_SMALL = "small"
     
-    # Asteroid variants (letters and numbers from the folder structure)
-    VARIANTS = {
-        "large": ["a1", "a3", "b1", "b3", "c1", "c3", "c4"],
-        "medium": ["a1", "a3", "a4", "b4", "c1", "c3", "c4", "d1", "d3", "d4"],
-        "small": ["a1", "a3", "a4", "b1", "b3", "b4"]
-    }
-    
     def __init__(self, x, y, size=SIZE_LARGE, variant=None):
         # Set radius based on size
         radius_map = {
@@ -39,7 +34,9 @@ class AnimatedAsteroid(CircleShape):
         super().__init__(x, y, radius)
         
         self.size = size
-        self.variant = variant or random.choice(self.VARIANTS[size])
+        # Get available variants from asset manager
+        available_variants = asset_manager.get_available_variants(size)
+        self.variant = variant or random.choice(available_variants) if available_variants else "a1"
         
         # Animation properties
         self.frames = []
@@ -51,43 +48,43 @@ class AnimatedAsteroid(CircleShape):
         # Load animation frames
         self._load_animation_frames()
         
+        # Generate static polygon points for basic mode (cached to avoid regeneration each frame)
+        self._polygon_points = None
+        
         # Velocity for movement
         self.velocity = pygame.Vector2(0, 0)
     
     def _load_animation_frames(self):
-        """Load all animation frames for this asteroid."""
-        cache_key = f"{self.size}_{self.variant}"
-        
-        if cache_key in self._sprite_cache:
-            self.frames = self._sprite_cache[cache_key]
-            return
-        
-        frames = []
-        base_path = os.path.join("assets", "asteroids", self.size)
-        
-        # Load frames 0-15 (16 frames total, matching AppGameKit)
-        for i in range(16):
-            filename = f"{self.variant}{i:04d}.png"
-            filepath = os.path.join(base_path, filename)
+        """Load all animation frames for this asteroid from asset manager."""
+        self.frames = asset_manager.get_asteroid_frames(self.size, self.variant)
+    
+    def _generate_polygon_points(self):
+        """Generate irregular polygon points for basic mode rendering (cached)."""
+        if self._polygon_points is None:
+            num_sides = random.randint(5, 7)  # 5-7 sided polygon
+            self._polygon_points = []
             
-            try:
-                if os.path.exists(filepath):
-                    frame = pygame.image.load(filepath).convert_alpha()
-                    frames.append(frame)
-                else:
-                    print(f"Warning: Frame not found: {filepath}")
-            except Exception as e:
-                print(f"Error loading frame {filepath}: {e}")
+            # Create points around a circle with random radius variations
+            # Store as relative offsets from center
+            for i in range(num_sides):
+                angle = (2 * math.pi * i) / num_sides
+                # Add some randomness to the radius (70% to 100% of full radius)
+                radius_variation = random.uniform(0.7, 1.0)
+                point_radius = self.radius * radius_variation
+                
+                # Store as offset from center
+                offset_x = point_radius * math.cos(angle)
+                offset_y = point_radius * math.sin(angle)
+                self._polygon_points.append((offset_x, offset_y))
         
-        if frames:
-            self.frames = frames
-            self._sprite_cache[cache_key] = frames
-        else:
-            print(f"No frames loaded for {cache_key}, using fallback")
-            # Create a simple fallback frame
-            fallback = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(fallback, (150, 100, 80), (self.radius, self.radius), self.radius)
-            self.frames = [fallback]
+        # Convert cached relative points to absolute screen coordinates
+        absolute_points = []
+        for offset_x, offset_y in self._polygon_points:
+            x = self.position.x + offset_x
+            y = self.position.y + offset_y
+            absolute_points.append((x, y))
+        
+        return absolute_points
     
     def update(self, dt):
         """Update asteroid position and animation."""
@@ -115,19 +112,40 @@ class AnimatedAsteroid(CircleShape):
             self.current_frame = (self.current_frame + 1) % len(self.frames)
     
     def draw(self, surface):
-        """Draw the animated asteroid."""
+        """Draw the asteroid using current graphics mode."""
+        if graphics_manager.should_use_sprites() and self.frames:
+            self._draw_sprite(surface)
+        else:
+            self._draw_basic(surface)
+    
+    def _draw_sprite(self, surface):
+        """Draw the asteroid using sprite animation."""
         if self.frames:
             frame = self.frames[self.current_frame]
-            
-            # Center the sprite on the asteroid position
             rect = frame.get_rect()
             rect.center = (int(self.position.x), int(self.position.y))
             surface.blit(frame, rect)
         else:
-            # Fallback: draw a simple circle
-            pygame.draw.circle(surface, (150, 100, 80), 
+            # Fallback to basic drawing
+            self._draw_basic(surface)
+    
+    def _draw_basic(self, surface):
+        """Draw the asteroid using basic shapes."""
+        # Get colors from graphics manager
+        asteroid_color = graphics_manager.get_asteroid_color()
+        outline_color = graphics_manager.get_asteroid_outline_color()
+        is_wireframe = graphics_manager.is_wireframe_only()
+        
+        if is_wireframe:
+            # Minimal mode: simple circle wireframe
+            pygame.draw.circle(surface, asteroid_color, 
                             (int(self.position.x), int(self.position.y)), 
                             int(self.radius), 2)
+        else:
+            # Basic mode: irregular polygon shape
+            polygon_points = self._generate_polygon_points()
+            pygame.draw.polygon(surface, asteroid_color, polygon_points)
+            pygame.draw.polygon(surface, outline_color, polygon_points, 2)
     
     def set_random_velocity(self, min_speed=1.0, max_speed=3.0):
         """Set random velocity (matching AppGameKit random movement)."""
@@ -199,12 +217,21 @@ class Asteroid(AnimatedAsteroid):
         asteroid2.velocity = new_vector_2 * 1.2
 
     def draw(self, screen):
-        """Draw the asteroid as an irregular polygon."""
+        """Draw the asteroid as an irregular polygon using current graphics mode."""
         points = self.get_asteroid_points()
-        # Draw filled asteroid with brownish color
-        pygame.draw.polygon(screen, (120, 80, 60), points)
-        # Draw outline in lighter brown
-        pygame.draw.polygon(screen, (180, 120, 90), points, 2)
+        
+        # Get colors from graphics manager
+        asteroid_color = graphics_manager.get_asteroid_color()
+        outline_color = graphics_manager.get_asteroid_outline_color()
+        is_wireframe = graphics_manager.is_wireframe_only()
+        
+        if is_wireframe:
+            # Wireframe only - just the outline
+            pygame.draw.polygon(screen, asteroid_color, points, 2)
+        else:
+            # Filled polygon with outline
+            pygame.draw.polygon(screen, asteroid_color, points)
+            pygame.draw.polygon(screen, outline_color, points, 2)
     
     def update(self, dt):
         """Update asteroid position and rotation."""

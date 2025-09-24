@@ -8,6 +8,7 @@ from typing import Optional
 from ..game.constants import (
     SCREEN_WIDTH, SCREEN_HEIGHT
 )
+from .asset_manager import asset_manager
 
 
 class LoadingScreen:
@@ -134,6 +135,39 @@ class LoadingScreen:
         # Bright center
         pygame.draw.circle(self.screen, (255, 255, 255), (int(x), int(y)), 3)
     
+    def _draw_asset_progress(self) -> None:
+        """Draw asset loading progress bar."""
+        progress = asset_manager.get_loading_progress()
+        
+        if progress < 1.0:  # Only show if still loading
+            # Progress bar position (bottom of screen, above message)
+            bar_width = 400
+            bar_height = 20
+            bar_x = (SCREEN_WIDTH - bar_width) // 2
+            bar_y = SCREEN_HEIGHT - 150
+            
+            # Background bar
+            pygame.draw.rect(self.screen, (40, 40, 40), 
+                           (bar_x, bar_y, bar_width, bar_height))
+            pygame.draw.rect(self.screen, (100, 100, 100), 
+                           (bar_x, bar_y, bar_width, bar_height), 2)
+            
+            # Progress fill
+            fill_width = int(bar_width * progress)
+            if fill_width > 0:
+                pygame.draw.rect(self.screen, (100, 150, 255), 
+                               (bar_x, bar_y, fill_width, bar_height))
+            
+            # Progress text
+            try:
+                progress_font = pygame.font.Font(None, 24)
+                progress_text = f"Loading sprites... {int(progress * 100)}%"
+                progress_surface = progress_font.render(progress_text, True, (200, 200, 200))
+                progress_rect = progress_surface.get_rect(center=(SCREEN_WIDTH // 2, bar_y - 25))
+                self.screen.blit(progress_surface, progress_rect)
+            except:
+                pass
+    
     def _update_animation(self) -> float:
         """Update the ship/shot/asteroid animation and return progress (0.0 to 1.0)."""
         elapsed = time.time() - self.start_time
@@ -239,12 +273,27 @@ class LoadingScreen:
         # Draw the ship shooting asteroid animation
         animation_progress = self._draw_animation()
         
+        # Draw asset loading progress
+        self._draw_asset_progress()
+        
         # Show "Press SPACE to start" message after animation completes or 3 seconds
-        if animation_progress >= 1.0 or elapsed >= 3.0:
+        # Also check if assets are loaded
+        assets_ready = asset_manager.is_loading_complete()
+        if (animation_progress >= 1.0 or elapsed >= 3.0) and assets_ready:
             try:
                 message_font = pygame.font.Font(None, 48)
                 message_text = "Press SPACE to start"
                 message_surface = message_font.render(message_text, True, (255, 255, 255))
+                message_rect = message_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80))
+                self.screen.blit(message_surface, message_rect)
+            except:
+                pass
+        elif not assets_ready:
+            # Show loading message
+            try:
+                message_font = pygame.font.Font(None, 48)
+                message_text = "Loading assets..."
+                message_surface = message_font.render(message_text, True, (200, 200, 200))
                 message_rect = message_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80))
                 self.screen.blit(message_surface, message_rect)
             except:

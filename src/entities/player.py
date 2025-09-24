@@ -1,6 +1,7 @@
 """Player ship entity."""
 
 import pygame
+import math
 from .shot import Shot
 from .base import CircleShape
 from ..game.constants import (
@@ -8,6 +9,7 @@ from ..game.constants import (
     PLAYER_MAX_SPEED, PLAYER_SHOOT_SPEED, PLAYER_SHOOT_COOLDOWN, SHOT_RADIUS
 )
 from ..utils.sound import play_sound
+from ..utils.graphics_manager import graphics_manager
 
 
 class Player(CircleShape):
@@ -29,6 +31,23 @@ class Player(CircleShape):
         c = self.position - forward * self.radius + right
         return [a, b, c]
     
+    def chevron(self):
+        """Calculate the chevron/mouse cursor points for enhanced basic mode."""
+        forward = pygame.Vector2(0, 1).rotate(self.rotation)
+        right = pygame.Vector2(0, 1).rotate(self.rotation + 90) * self.radius / 1.5
+        
+        # Main triangle points
+        tip = self.position + forward * self.radius
+        left = self.position - forward * self.radius - right
+        right_point = self.position - forward * self.radius + right
+        
+        # Add indentation points for chevron shape
+        indent_depth = self.radius * 0.3  # How deep the indentation goes
+        left_indent = self.position - forward * (self.radius - indent_depth) - right * 0.3
+        right_indent = self.position - forward * (self.radius - indent_depth) + right * 0.3
+        
+        return [tip, left, left_indent, right_indent, right_point]
+    
     def engine_triangle(self):
         """Calculate the engine glow triangle points."""
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
@@ -42,7 +61,7 @@ class Player(CircleShape):
         return [back_point, left_point, right_point]
     
     def draw(self, screen):
-        """Draw the enhanced player ship with engine glow."""
+        """Draw the player ship using current graphics mode."""
         # Determine if we should draw (for blinking effect)
         should_draw = True
         if self.invulnerable_timer > 0:
@@ -55,20 +74,70 @@ class Player(CircleShape):
             is_thrusting = (keys[pygame.K_w] or keys[pygame.K_UP] or 
                           keys[pygame.K_s] or keys[pygame.K_DOWN])
             
-            # Draw engine glow first (behind ship) if thrusting
-            if is_thrusting:
-                engine_points = self.engine_triangle()
-                # Engine glow with orange-red color
-                pygame.draw.polygon(screen, (255, 100, 50), engine_points)
-                # Add a brighter inner glow
-                pygame.draw.polygon(screen, (255, 200, 100), engine_points, 2)
+            # Get ship sprite from graphics manager
+            ship_sprite = graphics_manager.get_ship_sprite()
             
-            # Draw main ship body
+            if ship_sprite and graphics_manager.should_use_sprites():
+                self._draw_sprite(screen, ship_sprite, is_thrusting)
+            else:
+                self._draw_basic(screen, is_thrusting)
+    
+    def _draw_sprite(self, screen, sprite, is_thrusting):
+        """Draw the ship using a sprite image."""
+        # Scale down the sprite to be more reasonable size
+        # Make it a bit larger - 4x the radius for better visibility
+        target_size = int(self.radius * 4)  # Increased from 3x to 4x
+        scaled_sprite = pygame.transform.scale(sprite, (target_size, target_size))
+        
+        # Rotate the sprite to match ship rotation
+        # Adjust rotation to make ship face forward correctly
+        # Add 180 degrees to make the ship face forward instead of backward
+        corrected_rotation = -self.rotation + 180
+        rotated_sprite = pygame.transform.rotate(scaled_sprite, corrected_rotation)
+        
+        # Get the rect for positioning
+        sprite_rect = rotated_sprite.get_rect()
+        sprite_rect.center = (int(self.position.x), int(self.position.y))
+        
+        # Draw engine glow first if thrusting
+        if is_thrusting:
+            engine_points = self.engine_triangle()
+            # Engine glow with orange-red color
+            pygame.draw.polygon(screen, (255, 100, 50), engine_points)
+            # Add a brighter inner glow
+            pygame.draw.polygon(screen, (255, 200, 100), engine_points, 2)
+        
+        # Draw the sprite
+        screen.blit(rotated_sprite, sprite_rect)
+    
+    def _draw_basic(self, screen, is_thrusting):
+        """Draw the ship using basic shapes (original style)."""
+        # Get colors from graphics manager
+        ship_color = graphics_manager.get_ship_color()
+        outline_color = graphics_manager.get_ship_outline_color()
+        is_wireframe = graphics_manager.is_wireframe_only()
+        
+        # Draw engine glow first (behind ship) if thrusting
+        if is_thrusting:
+            engine_points = self.engine_triangle()
+            if is_wireframe:
+                # Wireframe engine - just outline
+                pygame.draw.polygon(screen, (255, 200, 100), engine_points, 2)
+            else:
+                # Filled engine glow
+                pygame.draw.polygon(screen, (255, 100, 50), engine_points)
+                pygame.draw.polygon(screen, (255, 200, 100), engine_points, 2)
+        
+        # Choose shape based on graphics mode
+        if is_wireframe:
+            # Minimal mode: simple triangle wireframe
             ship_points = self.triangle()
-            # Ship body with light blue color
-            pygame.draw.polygon(screen, (150, 150, 255), ship_points)
-            # Ship outline in white
-            pygame.draw.polygon(screen, "white", ship_points, 2)
+            pygame.draw.polygon(screen, ship_color, ship_points, 2)
+        else:
+            # Basic mode: enhanced chevron shape
+            ship_points = self.chevron()
+            pygame.draw.polygon(screen, ship_color, ship_points)
+            pygame.draw.polygon(screen, outline_color, ship_points, 2)
 
     def rotate(self, dt):
         """Rotate the player ship."""
